@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My3DConverter - Professional 3D Model Generator</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .animate-spin {
+            animation: spin 1s linear infinite;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useRef, useEffect } = React;
+
+        const Lock = () => (<svg className="w-16 h-16 text-indigo-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>);
+        const Upload = () => (<svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>);
+        const Loader = () => (<svg className="w-6 h-6 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83" /></svg>);
+        const Download = () => (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4m4-5l5 5m0 0l5-5m-5 5V3" /></svg>);
+        const Cube = () => (<svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>);
+        const CheckCircle = () => (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>);
+
+        // Password Screen Component
+        function PasswordScreen({ onUnlock }) {
+            const [password, setPassword] = useState('');
+            const [error, setError] = useState(false);
+            const [checking, setChecking] = useState(false);
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setChecking(true);
+                setError(false);
+
+                try {
+                    // Test password by calling health endpoint with password
+                    const response = await fetch('/api/generate', {
+                        method: 'POST',
+                        headers: {
+                            'x-app-password': password
+                        },
+                        body: new FormData() // Empty, just testing auth
+                    });
+
+                    if (response.status === 401 || response.status === 403) {
+                        setError(true);
+                        setPassword('');
+                    } else {
+                        // Password correct! (even if request fails for other reasons)
+                        sessionStorage.setItem('app_password', password);
+                        onUnlock(password);
+                    }
+                } catch (err) {
+                    setError(true);
+                    setPassword('');
+                } finally {
+                    setChecking(false);
+                }
+            };
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full">
+                        <Lock />
+                        <h1 className="text-3xl font-bold text-center mb-2 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                            My3DConverter
+                        </h1>
+                        <p className="text-gray-600 text-center mb-8">🔒 Private Access Required</p>
+                        
+                        <form onSubmit={handleSubmit}>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                Enter Password
+                            </label>
+                            <input
+                                type="password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                placeholder="Password"
+                                className={`w-full px-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 transition-all ${
+                                    error 
+                                        ? 'border-red-500 focus:ring-red-500 shake' 
+                                        : 'border-gray-300 focus:ring-indigo-500'
+                                }`}
+                                autoFocus
+                                disabled={checking}
+                            />
+                            
+                            {error && (
+                                <p className="text-red-600 text-sm mt-2 flex items-center gap-2">
+                                    <span>❌</span> Incorrect password
+                                </p>
+                            )}
+                            
+                            <button
+                                type="submit"
+                                disabled={checking || !password}
+                                className={`w-full mt-6 px-6 py-3 rounded-xl shadow-lg transition-all font-semibold ${
+                                    checking || !password
+                                        ? 'bg-gray-400 cursor-not-allowed'
+                                        : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white'
+                                }`}
+                            >
+                                {checking ? (
+                                    <span className="flex items-center justify-center gap-2">
+                                        <Loader />
+                                        Checking...
+                                    </span>
+                                ) : (
+                                    'Unlock'
+                                )}
+                            </button>
+                        </form>
+                        
+                        <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                            <p className="text-xs text-blue-800">
+                                <strong>🔐 Secure:</strong> Your password is verified on the server. API keys are never exposed to users.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function MainApp({ appPassword }) {
+            const [image, setImage] = useState(null);
+            const [preview, setPreview] = useState(null);
+            const [loading, setLoading] = useState(false);
+            const [status, setStatus] = useState('');
+            const [error, setError] = useState(null);
+            const [result, setResult] = useState(null);
+            const [progress, setProgress] = useState(0);
+            const fileInput = useRef(null);
+
+            const handleFileChange = (e) => {
+                const file = e.target.files?.[0];
+                if (!file || !file.type.startsWith('image/')) {
+                    setError('Please upload a valid image');
+                    return;
+                }
+                setImage(file);
+                setError(null);
+                setResult(null);
+                const reader = new FileReader();
+                reader.onload = (e) => setPreview(e.target.result);
+                reader.readAsDataURL(file);
+            };
+
+            const pollStatus = async (requestId) => {
+                let attempts = 0;
+                const maxAttempts = 200; // 10 minutes
+
+                while (attempts < maxAttempts) {
+                    await new Promise(resolve => setTimeout(resolve, 3000));
+
+                    try {
+                        const statusRes = await fetch(`/api/status/${requestId}`, {
+                            headers: {
+                                'x-app-password': appPassword
+                            }
+                        });
+                        
+                        if (!statusRes.ok) {
+                            console.warn('Status check failed, retrying...');
+                            attempts++;
+                            continue;
+                        }
+
+                        const statusData = await statusRes.json();
+                        console.log('Status:', statusData.status);
+
+                        const elapsed = Math.floor((attempts * 3) / 60);
+                        setProgress(Math.min((attempts / maxAttempts) * 100, 95));
+
+                        if (statusData.status === 'COMPLETED') {
+                            setStatus('Fetching final result...');
+                            setProgress(100);
+                            
+                            const resultRes = await fetch(`/api/result/${requestId}`, {
+                                headers: {
+                                    'x-app-password': appPassword
+                                }
+                            });
+                            const resultData = await resultRes.json();
+                            
+                            console.log('Result:', resultData);
+                            setResult(resultData);
+                            return true;
+                        } else if (statusData.status === 'FAILED') {
+                            throw new Error('Generation failed on server');
+                        } else {
+                            setStatus(`Generating high-quality 3D model... (${elapsed} min)`);
+                        }
+                    } catch (pollError) {
+                        console.warn('Polling error:', pollError);
+                    }
+
+                    attempts++;
+                }
+
+                throw new Error('Timeout after 10 minutes');
+            };
+
+            const generate = async () => {
+                if (!image) {
+                    setError('Please upload an image first');
+                    return;
+                }
+
+                setLoading(true);
+                setError(null);
+                setResult(null);
+                setProgress(0);
+                setStatus('Uploading image...');
+
+                try {
+                    const formData = new FormData();
+                    formData.append('image', image);
+
+                    setStatus('Submitting to Meshy-6...');
+                    
+                    const submitRes = await fetch('/api/generate', {
+                        method: 'POST',
+                        headers: {
+                            'x-app-password': appPassword
+                        },
+                        body: formData
+                    });
+
+                    if (!submitRes.ok) {
+                        const errData = await submitRes.json();
+                        throw new Error(errData.error || 'Submit failed');
+                    }
+
+                    const submitData = await submitRes.json();
+                    console.log('Job submitted:', submitData.requestId);
+
+                    setStatus('Job submitted! Generating 3D model...');
+                    setProgress(10);
+
+                    await pollStatus(submitData.requestId);
+
+                } catch (err) {
+                    console.error('Error:', err);
+                    setError(err.message);
+                } finally {
+                    setLoading(false);
+                    setProgress(0);
+                }
+            };
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4 md:p-8">
+                    <div className="max-w-5xl mx-auto">
+                        {/* Header */}
+                        <div className="text-center mb-8">
+                            <div className="flex items-center justify-center gap-3 mb-4">
+                                <Cube />
+                                <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                                    My3DConverter
+                                </h1>
+                            </div>
+                            <p className="text-gray-600 text-xl mb-2">
+                                Professional Image to 3D Model Conversion
+                            </p>
+                            <p className="text-sm text-gray-500">
+                                Powered by Meshy-6 AI • Highest Quality • No CORS Issues
+                            </p>
+                        </div>
+
+                        {/* Upload */}
+                        <div className="bg-white rounded-2xl shadow-lg p-8 mb-6">
+                            <h2 className="text-xl font-semibold mb-6">Upload Image</h2>
+                            <div
+                                onClick={() => fileInput.current?.click()}
+                                className="border-3 border-dashed border-gray-300 rounded-xl p-12 text-center hover:border-indigo-400 hover:bg-indigo-50 transition-all cursor-pointer"
+                            >
+                                {preview ? (
+                                    <div>
+                                        <img src={preview} alt="Preview" className="max-h-64 mx-auto rounded-lg shadow-md mb-4" />
+                                        <p className="text-sm text-gray-600">Click to change image</p>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <Upload />
+                                        <p className="text-lg text-gray-700 mb-2">Click to upload image</p>
+                                        <p className="text-sm text-gray-500">PNG, JPG, JPEG supported</p>
+                                    </>
+                                )}
+                            </div>
+                            <input ref={fileInput} type="file" accept="image/*" onChange={handleFileChange} style={{ display: 'none' }} />
+                        </div>
+
+                        {/* Generate Button */}
+                        <div className="text-center mb-8">
+                            <button
+                                onClick={generate}
+                                disabled={!image || loading}
+                                className={`px-10 py-5 rounded-xl text-white font-semibold text-lg shadow-xl flex items-center gap-3 mx-auto transition-all ${
+                                    !image || loading
+                                        ? 'bg-gray-400 cursor-not-allowed'
+                                        : 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 transform hover:scale-105'
+                                }`}
+                            >
+                                {loading ? (
+                                    <>
+                                        <Loader />
+                                        <div className="text-left">
+                                            <div>Generating...</div>
+                                            {status && <div className="text-sm mt-1 opacity-90">{status}</div>}
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Cube />
+                                        Generate 3D Model
+                                    </>
+                                )}
+                            </button>
+                            
+                            {loading && progress > 0 && (
+                                <div className="mt-4 max-w-md mx-auto">
+                                    <div className="w-full bg-gray-200 rounded-full h-2">
+                                        <div 
+                                            className="bg-gradient-to-r from-blue-600 to-purple-600 h-2 rounded-full transition-all duration-500"
+                                            style={{ width: `${progress}%` }}
+                                        ></div>
+                                    </div>
+                                    <p className="text-sm text-gray-600 mt-2">{Math.round(progress)}% complete</p>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Error */}
+                        {error && (
+                            <div className="bg-red-50 border-l-4 border-red-500 p-6 rounded-lg mb-8">
+                                <p className="text-red-800 font-semibold mb-2">Error</p>
+                                <p className="text-red-700">{error}</p>
+                            </div>
+                        )}
+
+                        {/* Result */}
+                        {result && (
+                            <div className="bg-white rounded-2xl shadow-lg p-8 mb-8">
+                                <h2 className="text-2xl font-semibold mb-6 flex items-center gap-3 text-green-700">
+                                    <CheckCircle />
+                                    3D Model Ready!
+                                </h2>
+                                
+                                <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6">
+                                    <p className="text-lg font-semibold text-center mb-6">
+                                        Your professional 3D model is ready for download!
+                                    </p>
+                                    
+                                    <div className="space-y-3">
+                                        {/* Main GLB */}
+                                        {result.model_glb?.url && (
+                                            <a
+                                                href={result.model_glb.url}
+                                                download="model.glb"
+                                                target="_blank"
+                                                className="block w-full px-6 py-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold rounded-xl shadow-lg transition-all flex items-center justify-center gap-3"
+                                            >
+                                                <Download />
+                                                Download GLB ({(result.model_glb.file_size / 1024 / 1024).toFixed(2)} MB)
+                                            </a>
+                                        )}
+                                        
+                                        {/* Additional Formats */}
+                                        {result.model_urls && (
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                                {result.model_urls.obj?.url && (
+                                                    <a href={result.model_urls.obj.url} download="model.obj" target="_blank" className="px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-all text-center text-sm">
+                                                        OBJ
+                                                    </a>
+                                                )}
+                                                {result.model_urls.fbx?.url && (
+                                                    <a href={result.model_urls.fbx.url} download="model.fbx" target="_blank" className="px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition-all text-center text-sm">
+                                                        FBX
+                                                    </a>
+                                                )}
+                                                {result.model_urls.usdz?.url && (
+                                                    <a href={result.model_urls.usdz.url} download="model.usdz" target="_blank" className="px-4 py-3 bg-violet-600 hover:bg-violet-700 text-white font-semibold rounded-lg transition-all text-center text-sm">
+                                                        USDZ
+                                                    </a>
+                                                )}
+                                                {result.model_urls.stl?.url && (
+                                                    <a href={result.model_urls.stl.url} download="model.stl" target="_blank" className="px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-all text-center text-sm">
+                                                        STL
+                                                    </a>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Features */}
+                        <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-6">
+                            <h3 className="font-semibold text-blue-900 mb-3">✨ Features</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm text-blue-800">
+                                <div className="flex items-start gap-2">
+                                    <span>⭐</span>
+                                    <span>Highest quality Meshy-6 AI</span>
+                                </div>
+                                <div className="flex items-start gap-2">
+                                    <span>📦</span>
+                                    <span>Multiple formats (GLB, OBJ, FBX, STL)</span>
+                                </div>
+                                <div className="flex items-start gap-2">
+                                    <span>🚀</span>
+                                    <span>No CORS issues - works every time!</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="text-center text-sm text-gray-500 mt-8">
+                            <p>My3DConverter • Deployed on Railway</p>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Main App Wrapper with Authentication
+        function App() {
+            const [authenticated, setAuthenticated] = useState(false);
+            const [appPassword, setAppPassword] = useState('');
+
+            useEffect(() => {
+                // Check if already authenticated in this session
+                const savedPassword = sessionStorage.getItem('app_password');
+                if (savedPassword) {
+                    setAppPassword(savedPassword);
+                    setAuthenticated(true);
+                }
+            }, []);
+
+            const handleUnlock = (password) => {
+                setAppPassword(password);
+                setAuthenticated(true);
+            };
+
+            if (!authenticated) {
+                return <PasswordScreen onUnlock={handleUnlock} />;
+            }
+
+            return <MainApp appPassword={appPassword} />;
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
