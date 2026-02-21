@@ -161,6 +161,60 @@ app.get('/api/status/:requestId', requirePassword, async (req, res) => {
     }
 });
 
+// Remove background using BiRefNet v2 (password protected)
+app.post('/api/remove-background', requirePassword, upload.single('image'), async (req, res) => {
+    try {
+        if (!FAL_API_KEY) {
+            return res.status(500).json({ error: 'API key not configured' });
+        }
+
+        if (!req.file) {
+            return res.status(400).json({ error: 'No image provided' });
+        }
+
+        console.log('🎨 Background removal requested:', req.file.originalname);
+
+        // Convert to base64
+        const base64Image = req.file.buffer.toString('base64');
+        const imageUrl = `data:${req.file.mimetype};base64,${base64Image}`;
+
+        console.log('🚀 Removing background with BiRefNet v2...');
+
+        // Call BiRefNet v2 API
+        const response = await fetch('https://queue.fal.run/fal-ai/birefnet/v2', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Key ${FAL_API_KEY}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                image_url: imageUrl
+            }),
+        });
+
+        if (!response.ok) {
+            const errText = await response.text();
+            console.error('❌ Background removal failed:', response.status, errText);
+            return res.status(response.status).json({ 
+                error: `Background removal failed: ${response.statusText}`,
+                details: errText
+            });
+        }
+
+        const result = await response.json();
+        console.log('✅ Background removed successfully!');
+
+        res.json({ 
+            success: true, 
+            image: result.image
+        });
+
+    } catch (error) {
+        console.error('❌ Background removal error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Get final result (password protected)
 app.get('/api/result/:requestId', requirePassword, async (req, res) => {
     try {
