@@ -438,6 +438,20 @@
                                                 href={cleanedImage}
                                                 download="background-removed.png"
                                                 className="flex-1 px-4 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-all text-center"
+                                                onClick={(e) => {
+                                                    // Don't navigate away - download in background
+                                                    e.preventDefault();
+                                                    fetch(cleanedImage)
+                                                        .then(res => res.blob())
+                                                        .then(blob => {
+                                                            const url = window.URL.createObjectURL(blob);
+                                                            const a = document.createElement('a');
+                                                            a.href = url;
+                                                            a.download = 'background-removed.png';
+                                                            a.click();
+                                                            window.URL.revokeObjectURL(url);
+                                                        });
+                                                }}
                                             >
                                                 💾 Download PNG
                                             </a>
@@ -448,7 +462,7 @@
                                                 }}
                                                 className="px-4 py-3 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-all"
                                             >
-                                                ↺ Try Again
+                                                ↺ Remove Again
                                             </button>
                                         </div>
                                         
