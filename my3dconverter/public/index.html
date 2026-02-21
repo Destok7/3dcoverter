@@ -326,13 +326,15 @@
                 try {
                     const formData = new FormData();
                     
-                    // Use cleaned image if available and selected
-                    if (useCleanedForGen && cleanedImage) {
+                    // Automatically use cleaned image if available, otherwise use original
+                    if (cleanedImage) {
                         setStatus('Using background-removed image...');
+                        setUseCleanedForGen(true);
                         // Fetch cleaned image and convert to blob
                         const cleanedBlob = await fetch(cleanedImage).then(r => r.blob());
                         formData.append('image', cleanedBlob, 'cleaned.png');
                     } else {
+                        setStatus('Using uploaded image...');
                         formData.append('image', image);
                     }
 
@@ -389,7 +391,7 @@
 
                         {/* Upload */}
                         <div className="bg-white rounded-2xl shadow-lg p-8 mb-6">
-                            <h2 className="text-xl font-semibold mb-6">Upload Image</h2>
+                            <h2 className="text-xl font-semibold mb-6">📤 Step 1: Upload Image</h2>
                             <div
                                 onClick={() => fileInput.current?.click()}
                                 className="border-3 border-dashed border-gray-300 rounded-xl p-12 text-center hover:border-indigo-400 hover:bg-indigo-50 transition-all cursor-pointer"
@@ -404,150 +406,162 @@
                                         <Upload />
                                         <p className="text-lg text-gray-700 mb-2">Click to upload image</p>
                                         <p className="text-sm text-gray-500">PNG, JPG, JPEG supported</p>
+                                        <p className="text-xs text-gray-400 mt-2">Works with both raw images and pre-edited transparent PNGs!</p>
                                     </>
                                 )}
                             </div>
                             <input ref={fileInput} type="file" accept="image/*" onChange={handleFileChange} style={{ display: 'none' }} />
                         </div>
 
-                        {/* Background Removal Section */}
-                        {preview && (
-                            <div className="bg-white rounded-2xl shadow-lg p-8 mb-6">
-                                <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                                    🎨 Step 2: Remove Background (Optional)
-                                </h2>
-                                <p className="text-sm text-gray-600 mb-4">
-                                    Remove the background for better 3D model results. Cost: $0.003
-                                </p>
+                        {/* Two-Path Workflow */}
+                        {preview && !result && (
+                            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl shadow-lg p-8 mb-6">
+                                <h2 className="text-2xl font-semibold mb-6 text-center">Choose Your Workflow:</h2>
                                 
-                                {cleanedImage ? (
-                                    <div>
-                                        <div className="grid grid-cols-2 gap-4 mb-4">
-                                            <div>
-                                                <p className="text-sm font-semibold text-gray-700 mb-2">Original</p>
-                                                <img src={preview} alt="Original" className="w-full rounded-lg border-2 border-gray-300" />
-                                            </div>
-                                            <div>
-                                                <p className="text-sm font-semibold text-gray-700 mb-2">Background Removed ✨</p>
-                                                <img src={cleanedImage} alt="Cleaned" className="w-full rounded-lg border-2 border-green-500" style={{backgroundColor: '#f0f0f0', backgroundImage: 'repeating-linear-gradient(45deg, #ccc 25%, transparent 25%, transparent 75%, #ccc 75%, #ccc), repeating-linear-gradient(45deg, #ccc 25%, #fff 25%, #fff 75%, #ccc 75%, #ccc)', backgroundSize: '20px 20px', backgroundPosition: '0 0, 10px 10px'}} />
-                                            </div>
-                                        </div>
-                                        
-                                        <div className="flex gap-3">
-                                            <a
-                                                href={cleanedImage}
-                                                download="background-removed.png"
-                                                className="flex-1 px-4 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-all text-center"
-                                                onClick={(e) => {
-                                                    // Don't navigate away - download in background
-                                                    e.preventDefault();
-                                                    fetch(cleanedImage)
-                                                        .then(res => res.blob())
-                                                        .then(blob => {
-                                                            const url = window.URL.createObjectURL(blob);
-                                                            const a = document.createElement('a');
-                                                            a.href = url;
-                                                            a.download = 'background-removed.png';
-                                                            a.click();
-                                                            window.URL.revokeObjectURL(url);
-                                                        });
-                                                }}
-                                            >
-                                                💾 Download PNG
-                                            </a>
-                                            <button
-                                                onClick={() => {
-                                                    setCleanedImage(null);
-                                                    setUseCleanedForGen(false);
-                                                }}
-                                                className="px-4 py-3 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-all"
-                                            >
-                                                ↺ Remove Again
-                                            </button>
-                                        </div>
-                                        
-                                        <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                                            <label className="flex items-center gap-3 cursor-pointer">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={useCleanedForGen}
-                                                    onChange={(e) => setUseCleanedForGen(e.target.checked)}
-                                                    className="w-5 h-5"
-                                                />
-                                                <span className="text-sm text-blue-900">
-                                                    <strong>Use background-removed image</strong> for 3D generation (recommended for better results)
-                                                </span>
-                                            </label>
-                                        </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {/* Path 1: Direct to 3D */}
+                                    <div className="bg-white rounded-xl p-6 border-2 border-purple-300">
+                                        <h3 className="text-lg font-bold text-purple-700 mb-3 flex items-center gap-2">
+                                            🚀 Quick Path: Direct to 3D
+                                        </h3>
+                                        <p className="text-sm text-gray-600 mb-4">
+                                            For images that <strong>already have transparent backgrounds</strong> or don't need background removal.
+                                        </p>
+                                        <button
+                                            onClick={generate}
+                                            disabled={loading || removingBg}
+                                            className={`w-full px-6 py-4 rounded-lg font-semibold transition-all ${
+                                                loading || removingBg
+                                                    ? 'bg-gray-300 cursor-not-allowed text-gray-500'
+                                                    : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-lg'
+                                            }`}
+                                        >
+                                            {loading ? '⏳ Generating...' : '🎯 Generate 3D Now'}
+                                        </button>
+                                        <p className="text-xs text-gray-500 mt-2 text-center">
+                                            Uses your uploaded image as-is
+                                        </p>
                                     </div>
-                                ) : (
-                                    <button
-                                        onClick={removeBackground}
-                                        disabled={removingBg}
-                                        className={`w-full px-6 py-4 rounded-xl font-semibold text-lg shadow-lg transition-all flex items-center justify-center gap-3 ${
-                                            removingBg
-                                                ? 'bg-gray-400 cursor-not-allowed'
-                                                : 'bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 text-white'
-                                        }`}
-                                    >
-                                        {removingBg ? (
-                                            <>
-                                                <Loader />
-                                                Removing Background...
-                                            </>
+
+                                    {/* Path 2: Remove BG First */}
+                                    <div className="bg-white rounded-xl p-6 border-2 border-pink-300">
+                                        <h3 className="text-lg font-bold text-pink-700 mb-3 flex items-center gap-2">
+                                            🎨 Full Path: Remove Background First
+                                        </h3>
+                                        <p className="text-sm text-gray-600 mb-4">
+                                            For images with backgrounds. Remove background, then generate 3D for <strong>better results</strong>.
+                                        </p>
+                                        
+                                        {!cleanedImage ? (
+                                            <button
+                                                onClick={removeBackground}
+                                                disabled={loading || removingBg}
+                                                className={`w-full px-6 py-4 rounded-lg font-semibold transition-all ${
+                                                    loading || removingBg
+                                                        ? 'bg-gray-300 cursor-not-allowed text-gray-500'
+                                                        : 'bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 text-white shadow-lg'
+                                                }`}
+                                            >
+                                                {removingBg ? '⏳ Removing...' : '✨ Remove Background'}
+                                            </button>
                                         ) : (
-                                            <>
-                                                ✨ Remove Background
-                                            </>
+                                            <div>
+                                                <div className="flex items-center gap-2 text-green-700 font-semibold mb-2">
+                                                    <CheckCircle />
+                                                    Background Removed!
+                                                </div>
+                                                <button
+                                                    onClick={generate}
+                                                    disabled={loading}
+                                                    className={`w-full px-6 py-4 rounded-lg font-semibold transition-all mb-2 ${
+                                                        loading
+                                                            ? 'bg-gray-300 cursor-not-allowed text-gray-500'
+                                                            : 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg'
+                                                    }`}
+                                                >
+                                                    {loading ? '⏳ Generating...' : '🎯 Generate 3D from Cleaned Image'}
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        setCleanedImage(null);
+                                                        setUseCleanedForGen(false);
+                                                    }}
+                                                    className="w-full px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg transition-all text-sm"
+                                                >
+                                                    ↺ Remove Background Again
+                                                </button>
+                                            </div>
                                         )}
-                                    </button>
-                                )}
+                                        <p className="text-xs text-gray-500 mt-2 text-center">
+                                            Cost: $0.003 + better 3D quality
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
                         )}
 
-                        {/* Generate Button */}
-                        <div className="text-center mb-8">
-                            <h2 className="text-xl font-semibold mb-4">
-                                {cleanedImage ? '🎨 Step 3: Generate 3D Model' : '📦 Step 2: Generate 3D Model'}
-                            </h2>
-                            <button
-                                onClick={generate}
-                                disabled={!image || loading}
-                                className={`px-10 py-5 rounded-xl text-white font-semibold text-lg shadow-xl flex items-center gap-3 mx-auto transition-all ${
-                                    !image || loading
-                                        ? 'bg-gray-400 cursor-not-allowed'
-                                        : 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 transform hover:scale-105'
-                                }`}
-                            >
-                                {loading ? (
-                                    <>
-                                        <Loader />
-                                        <div className="text-left">
-                                            <div>Generating...</div>
-                                            {status && <div className="text-sm mt-1 opacity-90">{status}</div>}
-                                        </div>
-                                    </>
-                                ) : (
-                                    <>
-                                        <Cube />
-                                        Generate 3D Model
-                                    </>
-                                )}
-                            </button>
-                            
-                            {loading && progress > 0 && (
-                                <div className="mt-4 max-w-md mx-auto">
-                                    <div className="w-full bg-gray-200 rounded-full h-2">
-                                        <div 
-                                            className="bg-gradient-to-r from-blue-600 to-purple-600 h-2 rounded-full transition-all duration-500"
-                                            style={{ width: `${progress}%` }}
-                                        ></div>
+                        {/* Background Removal Result Preview */}
+                        {cleanedImage && !result && (
+                            <div className="bg-white rounded-2xl shadow-lg p-8 mb-6">
+                                <h2 className="text-xl font-semibold mb-4">Before & After Comparison</h2>
+                                <div className="grid grid-cols-2 gap-4 mb-4">
+                                    <div>
+                                        <p className="text-sm font-semibold text-gray-700 mb-2">Original</p>
+                                        <img src={preview} alt="Original" className="w-full rounded-lg border-2 border-gray-300" />
                                     </div>
-                                    <p className="text-sm text-gray-600 mt-2">{Math.round(progress)}% complete</p>
+                                    <div>
+                                        <p className="text-sm font-semibold text-gray-700 mb-2">Background Removed ✨</p>
+                                        <img src={cleanedImage} alt="Cleaned" className="w-full rounded-lg border-2 border-green-500" style={{backgroundColor: '#f0f0f0', backgroundImage: 'repeating-linear-gradient(45deg, #ccc 25%, transparent 25%, transparent 75%, #ccc 75%, #ccc), repeating-linear-gradient(45deg, #ccc 25%, #fff 25%, #fff 75%, #ccc 75%, #ccc)', backgroundSize: '20px 20px', backgroundPosition: '0 0, 10px 10px'}} />
+                                    </div>
                                 </div>
-                            )}
-                        </div>
-
+                                
+                                <div className="flex gap-3">
+                                    <a
+                                        href={cleanedImage}
+                                        download="background-removed.png"
+                                        className="flex-1 px-4 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-all text-center"
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            fetch(cleanedImage)
+                                                .then(res => res.blob())
+                                                .then(blob => {
+                                                    const url = window.URL.createObjectURL(blob);
+                                                    const a = document.createElement('a');
+                                                    a.href = url;
+                                                    a.download = 'background-removed.png';
+                                                    a.click();
+                                                    window.URL.revokeObjectURL(url);
+                                                });
+                                        }}
+                                    >
+                                        💾 Download PNG
+                                    </a>
+                                </div>
+                            </div>
+                        )}
+                        {/* Loading Progress */}
+                        {loading && (
+                            <div className="bg-white rounded-2xl shadow-lg p-8 mb-6">
+                                <h2 className="text-xl font-semibold mb-4 flex items-center gap-3">
+                                    <Loader />
+                                    Generating 3D Model...
+                                </h2>
+                                {status && <p className="text-gray-600 mb-4">{status}</p>}
+                                {progress > 0 && (
+                                    <div>
+                                        <div className="w-full bg-gray-200 rounded-full h-3 mb-2">
+                                            <div 
+                                                className="bg-gradient-to-r from-blue-600 to-purple-600 h-3 rounded-full transition-all duration-500"
+                                                style={{ width: `${progress}%` }}
+                                            ></div>
+                                        </div>
+                                        <p className="text-sm text-gray-600 text-center">{Math.round(progress)}% complete</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                            
+                            
                         {/* Error */}
                         {error && (
                             <div className="bg-red-50 border-l-4 border-red-500 p-6 rounded-lg mb-8">
