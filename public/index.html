@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My3DConverter - Professional 3D Model Generator</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module" src="https://unpkg.com/@google/model-viewer@4.2.0/dist/model-viewer.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .animate-spin {
+            animation: spin 1s linear infinite;
+        }
+        model-viewer {
+            width: 100%;
+            height: 420px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            --poster-color: transparent;
+        }
+        model-viewer::part(default-progress-bar) {
+            background-color: #6366f1;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useRef, useEffect } = React;
+
+        const Lock = () => (<svg className="w-16 h-16 text-indigo-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>);
+        const Upload = () => (<svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>);
+        const Loader = () => (<svg className="w-6 h-6 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83" /></svg>);
+        const Download = () => (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4m4-5l5 5m0 0l5-5m-5 5V3" /></svg>);
+        const Cube = () => (<svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>);
+        const CheckCircle = () => (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>);
+
+        // Password Screen Component
+        function PasswordScreen({ onUnlock }) {
+            const [password, setPassword] = useState('');
+            const [error, setError] = useState(false);
+            const [checking, setChecking] = useState(false);
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setChecking(true);
+                setError(false);
+
+                try {
+                    // Test password by calling health endpoint with password
+                    const response = await fetch('/api/generate', {
+                        method: 'POST',
+                        headers: {
+                            'x-app-password': password
+                        },
+                        body: new FormData() // Empty, just testing auth
+                    });
+
+                    if (response.status === 401 || response.status === 403) {
+                        setError(true);
+                        setPassword('');
+                    } else {
+                        // Password correct! (even if request fails for other reasons)
+                        sessionStorage.setItem('app_password', password);
+                        onUnlock(password);
+                    }
+                } catch (err) {
+                    setError(true);
+                    setPassword('');
+                } finally {
+                    setChecking(false);
+                }
+            };
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full">
+                        <Lock />
+                        <h1 className="text-3xl font-bold text-center mb-2 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                            My3DConverter
+                        </h1>
+                        <p className="text-gray-600 text-center mb-8">🔒 Private Access Required</p>
+                        
+                        <form onSubmit={handleSubmit}>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                Enter Password
+                            </label>
+                            <input
+                                type="password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                placeholder="Password"
+                                className={`w-full px-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 transition-all ${
+                                    error 
+                                        ? 'border-red-500 focus:ring-red-500 shake' 
+                                        : 'border-gray-300 focus:ring-indigo-500'
+                                }`}
+                                autoFocus
+                                disabled={checking}
+                            />
+                            
+                            {error && (
+                                <p className="text-red-600 text-sm mt-2 flex items-center gap-2">
+                                    <span>❌</span> Incorrect password
+                                </p>
+                            )}
+                            
+                            <button
+                                type="submit"
+                                disabled={checking || !password}
+                                className={`w-full mt-6 px-6 py-3 rounded-xl shadow-lg transition-all font-semibold ${
+                                    checking || !password
+                                        ? 'bg-gray-400 cursor-not-allowed'
+                                        : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white'
+                                }`}
+                            >
+                                {checking ? (
+                                    <span className="flex items-center justify-center gap-2">
+                                        <Loader />
+                                        Checking...
+                                    </span>
+                                ) : (
+                                    'Unlock'
+                                )}
+                            </button>
+                        </form>
+                        
+                        <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                            <p className="text-xs text-blue-800">
+                                <strong>🔐 Secure:</strong> Your password is verified on the server. API keys are never exposed to users.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function MainApp({ appPassword }) {
+            const [image, setImage] = useState(null);
+            const [preview, setPreview] = useState(null);
+            const [loading, setLoading] = useState(false);
+            const [removingBg, setRemovingBg] = useState(false);
+            const [cleanedImage, setCleanedImage] = useState(null);
+            const [useCleanedForGen, setUseCleanedForGen] = useState(false);
+            const [status, setStatus] = useState('');
+            const [error, setError] = useState(null);
+            const [result, setResult] = useState(null);
+            const [progress, setProgress] = useState(0);
+            const fileInput = useRef(null);
+
+            const handleFileChange = (e) => {
+                const file = e.target.files?.[0];
+                if (!file || !file.type.startsWith('image/')) {
+                    setError('Please upload a valid image');
+                    return;
+                }
+                setImage(file);
+                setError(null);
+                setResult(null);
+                setCleanedImage(null);
+                setUseCleanedForGen(false);
+                const reader = new FileReader();
+                reader.onload = (e) => setPreview(e.target.result);
+                reader.readAsDataURL(file);
+            };
+
+            const removeBackground = async () => {
+                if (!image) {
+                    setError('Please upload an image first');
+                    return;
+                }
+
+                setRemovingBg(true);
+                setError(null);
+
+                try {
+                    const formData = new FormData();
+                    formData.append('image', image);
+
+                    // Submit job
+                    const submitRes = await fetch('/api/remove-background', {
+                        method: 'POST',
+                        headers: {
+                            'x-app-password': appPassword
+                        },
+                        body: formData
+                    });
+
+                    if (!submitRes.ok) {
+                        const errData = await submitRes.json();
+                        throw new Error(errData.error || 'Background removal failed');
+                    }
+
+                    const submitData = await submitRes.json();
+                    const requestId = submitData.requestId;
+                    console.log('BiRefNet job submitted:', requestId);
+
+                    // Poll for completion
+                    let attempts = 0;
+                    const maxAttempts = 60; // 3 minutes max
+
+                    while (attempts < maxAttempts) {
+                        await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds
+
+                        const statusRes = await fetch(`/api/bg-status/${requestId}`, {
+                            headers: {
+                                'x-app-password': appPassword
+                            }
+                        });
+
+                        if (!statusRes.ok) {
+                            console.warn('Status check failed, retrying...');
+                            attempts++;
+                            continue;
+                        }
+
+                        const statusData = await statusRes.json();
+                        console.log('BiRefNet status:', statusData.status);
+
+                        if (statusData.status === 'COMPLETED') {
+                            // Get final result
+                            const resultRes = await fetch(`/api/bg-result/${requestId}`, {
+                                headers: {
+                                    'x-app-password': appPassword
+                                }
+                            });
+
+                            const resultData = await resultRes.json();
+                            console.log('BiRefNet result:', resultData);
+
+                            // Get image URL from result
+                            const imageUrl = resultData.image?.url || resultData.data?.image?.url || resultData.url;
+                            
+                            if (imageUrl) {
+                                setCleanedImage(imageUrl);
+                                setUseCleanedForGen(true);
+                                setRemovingBg(false);
+                                return;
+                            } else {
+                                throw new Error('No image URL in result');
+                            }
+                        } else if (statusData.status === 'FAILED') {
+                            throw new Error('Background removal failed on server');
+                        }
+
+                        attempts++;
+                    }
+
+                    throw new Error('Background removal timeout after 3 minutes');
+
+                } catch (err) {
+                    console.error('Error:', err);
+                    setError(err.message);
+                } finally {
+                    setRemovingBg(false);
+                }
+            };
+
+            const pollStatus = async (requestId) => {
+                let attempts = 0;
+                const maxAttempts = 200; // 10 minutes
+
+                while (attempts < maxAttempts) {
+                    await new Promise(resolve => setTimeout(resolve, 3000));
+
+                    try {
+                        const statusRes = await fetch(`/api/status/${requestId}`, {
+                            headers: {
+                                'x-app-password': appPassword
+                            }
+                        });
+                        
+                        if (!statusRes.ok) {
+                            console.warn('Status check failed, retrying...');
+                            attempts++;
+                            continue;
+                        }
+
+                        const statusData = await statusRes.json();
+                        console.log('Status:', statusData.status);
+
+                        const elapsed = Math.floor((attempts * 3) / 60);
+                        setProgress(Math.min((attempts / maxAttempts) * 100, 95));
+
+                        if (statusData.status === 'COMPLETED') {
+                            setStatus('Fetching final result...');
+                            setProgress(100);
+                            
+                            const resultRes = await fetch(`/api/result/${requestId}`, {
+                                headers: {
+                                    'x-app-password': appPassword
+                                }
+                            });
+                            const resultData = await resultRes.json();
+                            
+                            console.log('Result:', resultData);
+                            setResult(resultData);
+                            return true;
+                        } else if (statusData.status === 'FAILED') {
+                            throw new Error('Generation failed on server');
+                        } else {
+                            setStatus(`Generating high-quality 3D model... (${elapsed} min)`);
+                        }
+                    } catch (pollError) {
+                        console.warn('Polling error:', pollError);
+                    }
+
+                    attempts++;
+                }
+
+                throw new Error('Timeout after 10 minutes');
+            };
+
+            const generate = async () => {
+                if (!image) {
+                    setError('Please upload an image first');
+                    return;
+                }
+
+                setLoading(true);
+                setError(null);
+                setResult(null);
+                setProgress(0);
+                setStatus('Uploading image...');
+
+                try {
+                    const formData = new FormData();
+                    
+                    // Automatically use cleaned image if available, otherwise use original
+                    if (cleanedImage) {
+                        setStatus('Using background-removed image...');
+                        setUseCleanedForGen(true);
+                        // Fetch cleaned image and convert to blob
+                        const cleanedBlob = await fetch(cleanedImage).then(r => r.blob());
+                        formData.append('image', cleanedBlob, 'cleaned.png');
+                    } else {
+                        setStatus('Using uploaded image...');
+                        formData.append('image', image);
+                    }
+
+                    setStatus('Submitting to Meshy-6...');
+                    
+                    const submitRes = await fetch('/api/generate', {
+                        method: 'POST',
+                        headers: {
+                            'x-app-password': appPassword
+                        },
+                        body: formData
+                    });
+
+                    if (!submitRes.ok) {
+                        const errData = await submitRes.json();
+                        throw new Error(errData.error || 'Submit failed');
+                    }
+
+                    const submitData = await submitRes.json();
+                    console.log('Job submitted:', submitData.requestId);
+
+                    setStatus('Job submitted! Generating 3D model...');
+                    setProgress(10);
+
+                    await pollStatus(submitData.requestId);
+
+                } catch (err) {
+                    console.error('Error:', err);
+                    setError(err.message);
+                } finally {
+                    setLoading(false);
+                    setProgress(0);
+                }
+            };
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4 md:p-8">
+                    <div className="max-w-5xl mx-auto">
+                        {/* Header */}
+                        <div className="text-center mb-8">
+                            <div className="flex items-center justify-center gap-3 mb-4">
+                                <Cube />
+                                <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                                    My3DConverter
+                                </h1>
+                            </div>
+                            <p className="text-gray-600 text-xl mb-2">
+                                Professional Image to 3D Model Conversion + Background Removal
+                            </p>
+                            <p className="text-sm text-gray-500">
+                                Powered by BiRefNet v2 & Meshy-6 AI • Highest Quality • No CORS Issues
+                            </p>
+                        </div>
+
+                        {/* Upload */}
+                        <div className="bg-white rounded-2xl shadow-lg p-8 mb-6">
+                            <h2 className="text-xl font-semibold mb-6">📤 Step 1: Upload Image</h2>
+                            <div
+                                onClick={() => fileInput.current?.click()}
+                                className="border-3 border-dashed border-gray-300 rounded-xl p-12 text-center hover:border-indigo-400 hover:bg-indigo-50 transition-all cursor-pointer"
+                            >
+                                {preview ? (
+                                    <div>
+                                        <img src={preview} alt="Preview" className="max-h-64 mx-auto rounded-lg shadow-md mb-4" />
+                                        <p className="text-sm text-gray-600">Click to change image</p>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <Upload />
+                                        <p className="text-lg text-gray-700 mb-2">Click to upload image</p>
+                                        <p className="text-sm text-gray-500">PNG, JPG, JPEG supported</p>
+                                        <p className="text-xs text-gray-400 mt-2">Works with both raw images and pre-edited transparent PNGs!</p>
+                                    </>
+                                )}
+                            </div>
+                            <input ref={fileInput} type="file" accept="image/*" onChange={handleFileChange} style={{ display: 'none' }} />
+                        </div>
+
+                        {/* Two-Path Workflow */}
+                        {preview && !result && (
+                            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl shadow-lg p-8 mb-6">
+                                <h2 className="text-2xl font-semibold mb-6 text-center">Choose Your Workflow:</h2>
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {/* Path 1: Direct to 3D */}
+                                    <div className="bg-white rounded-xl p-6 border-2 border-purple-300">
+                                        <h3 className="text-lg font-bold text-purple-700 mb-3 flex items-center gap-2">
+                                            🚀 Quick Path: Direct to 3D
+                                        </h3>
+                                        <p className="text-sm text-gray-600 mb-4">
+                                            For images that <strong>already have transparent backgrounds</strong> or don't need background removal.
+                                        </p>
+                                        <button
+                                            onClick={generate}
+                                            disabled={loading || removingBg}
+                                            className={`w-full px-6 py-4 rounded-lg font-semibold transition-all ${
+                                                loading || removingBg
+                                                    ? 'bg-gray-300 cursor-not-allowed text-gray-500'
+                                                    : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-lg'
+                                            }`}
+                                        >
+                                            {loading ? '⏳ Generating...' : '🎯 Generate 3D Now'}
+                                        </button>
+                                        <p className="text-xs text-gray-500 mt-2 text-center">
+                                            Uses your uploaded image as-is
+                                        </p>
+                                    </div>
+
+                                    {/* Path 2: Remove BG First */}
+                                    <div className="bg-white rounded-xl p-6 border-2 border-pink-300">
+                                        <h3 className="text-lg font-bold text-pink-700 mb-3 flex items-center gap-2">
+                                            🎨 Full Path: Remove Background First
+                                        </h3>
+                                        <p className="text-sm text-gray-600 mb-4">
+                                            For images with backgrounds. Remove background, then generate 3D for <strong>better results</strong>.
+                                        </p>
+                                        
+                                        {!cleanedImage ? (
+                                            <button
+                                                onClick={removeBackground}
+                                                disabled={loading || removingBg}
+                                                className={`w-full px-6 py-4 rounded-lg font-semibold transition-all ${
+                                                    loading || removingBg
+                                                        ? 'bg-gray-300 cursor-not-allowed text-gray-500'
+                                                        : 'bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 text-white shadow-lg'
+                                                }`}
+                                            >
+                                                {removingBg ? '⏳ Removing...' : '✨ Remove Background'}
+                                            </button>
+                                        ) : (
+                                            <div>
+                                                <div className="flex items-center gap-2 text-green-700 font-semibold mb-2">
+                                                    <CheckCircle />
+                                                    Background Removed!
+                                                </div>
+                                                <button
+                                                    onClick={generate}
+                                                    disabled={loading}
+                                                    className={`w-full px-6 py-4 rounded-lg font-semibold transition-all mb-2 ${
+                                                        loading
+                                                            ? 'bg-gray-300 cursor-not-allowed text-gray-500'
+                                                            : 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg'
+                                                    }`}
+                                                >
+                                                    {loading ? '⏳ Generating...' : '🎯 Generate 3D from Cleaned Image'}
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        setCleanedImage(null);
+                                                        setUseCleanedForGen(false);
+                                                    }}
+                                                    className="w-full px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg transition-all text-sm"
+                                                >
+                                                    ↺ Remove Background Again
+                                                </button>
+                                            </div>
+                                        )}
+                                        <p className="text-xs text-gray-500 mt-2 text-center">
+                                            Cost: $0.003 + better 3D quality
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Background Removal Result Preview */}
+                        {cleanedImage && !result && (
+                            <div className="bg-white rounded-2xl shadow-lg p-8 mb-6">
+                                <h2 className="text-xl font-semibold mb-4">Before & After Comparison</h2>
+                                <div className="grid grid-cols-2 gap-4 mb-4">
+                                    <div>
+                                        <p className="text-sm font-semibold text-gray-700 mb-2">Original</p>
+                                        <img src={preview} alt="Original" className="w-full rounded-lg border-2 border-gray-300" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-semibold text-gray-700 mb-2">Background Removed ✨</p>
+                                        <img src={cleanedImage} alt="Cleaned" className="w-full rounded-lg border-2 border-green-500" style={{backgroundColor: '#f0f0f0', backgroundImage: 'repeating-linear-gradient(45deg, #ccc 25%, transparent 25%, transparent 75%, #ccc 75%, #ccc), repeating-linear-gradient(45deg, #ccc 25%, #fff 25%, #fff 75%, #ccc 75%, #ccc)', backgroundSize: '20px 20px', backgroundPosition: '0 0, 10px 10px'}} />
+                                    </div>
+                                </div>
+                                
+                                <div className="flex gap-3">
+                                    <a
+                                        href={cleanedImage}
+                                        download="background-removed.png"
+                                        className="flex-1 px-4 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-all text-center"
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            fetch(cleanedImage)
+                                                .then(res => res.blob())
+                                                .then(blob => {
+                                                    const url = window.URL.createObjectURL(blob);
+                                                    const a = document.createElement('a');
+                                                    a.href = url;
+                                                    a.download = 'background-removed.png';
+                                                    a.click();
+                                                    window.URL.revokeObjectURL(url);
+                                                });
+                                        }}
+                                    >
+                                        💾 Download PNG
+                                    </a>
+                                </div>
+                            </div>
+                        )}
+                        {/* Loading Progress */}
+                        {loading && (
+                            <div className="bg-white rounded-2xl shadow-lg p-8 mb-6">
+                                <h2 className="text-xl font-semibold mb-4 flex items-center gap-3">
+                                    <Loader />
+                                    Generating 3D Model...
+                                </h2>
+                                {status && <p className="text-gray-600 mb-4">{status}</p>}
+                                {progress > 0 && (
+                                    <div>
+                                        <div className="w-full bg-gray-200 rounded-full h-3 mb-2">
+                                            <div 
+                                                className="bg-gradient-to-r from-blue-600 to-purple-600 h-3 rounded-full transition-all duration-500"
+                                                style={{ width: `${progress}%` }}
+                                            ></div>
+                                        </div>
+                                        <p className="text-sm text-gray-600 text-center">{Math.round(progress)}% complete</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                            
+                            
+                        {/* Error */}
+                        {error && (
+                            <div className="bg-red-50 border-l-4 border-red-500 p-6 rounded-lg mb-8">
+                                <p className="text-red-800 font-semibold mb-2">Error</p>
+                                <p className="text-red-700">{error}</p>
+                            </div>
+                        )}
+
+                        {/* Result */}
+                        {result && (
+                            <div className="bg-white rounded-2xl shadow-lg p-8 mb-8">
+                                <h2 className="text-2xl font-semibold mb-6 flex items-center gap-3 text-green-700">
+                                    <CheckCircle />
+                                    3D Model Ready!
+                                </h2>
+
+                                {/* 3D Viewer */}
+                                {result.model_glb?.url && (
+                                    <div className="mb-6">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <p className="text-sm font-semibold text-gray-600 flex items-center gap-1">
+                                                🖱️ Drag to rotate &nbsp;·&nbsp; Scroll to zoom &nbsp;·&nbsp; Right-click to pan
+                                            </p>
+                                            <span className="text-xs bg-indigo-100 text-indigo-700 font-semibold px-2 py-1 rounded-full">
+                                                Interactive 3D Preview
+                                            </span>
+                                        </div>
+                                        <model-viewer
+                                            src={result.model_glb.url}
+                                            camera-controls
+                                            auto-rotate
+                                            auto-rotate-delay="500"
+                                            rotation-per-second="30deg"
+                                            environment-image="neutral"
+                                            shadow-intensity="1"
+                                            exposure="1"
+                                            tone-mapping="commerce"
+                                            style={{width: '100%', height: '420px'}}
+                                        >
+                                            <div slot="progress-bar" style={{
+                                                position: 'absolute', bottom: 0, left: 0, right: 0,
+                                                height: '4px', background: '#6366f1',
+                                                transformOrigin: 'left'
+                                            }}></div>
+                                        </model-viewer>
+                                        <p className="text-xs text-gray-400 text-center mt-2">
+                                            Auto-rotation pauses when you interact · Powered by model-viewer
+                                        </p>
+                                    </div>
+                                )}
+                                
+                                <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6">
+                                    <p className="text-lg font-semibold text-center mb-6">
+                                        Download your 3D model in any format:
+                                    </p>
+                                    
+                                    <div className="space-y-3">
+                                        {/* Main GLB */}
+                                        {result.model_glb?.url && (
+                                            <a
+                                                href={result.model_glb.url}
+                                                download="model.glb"
+                                                target="_blank"
+                                                className="block w-full px-6 py-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold rounded-xl shadow-lg transition-all flex items-center justify-center gap-3"
+                                            >
+                                                <Download />
+                                                Download GLB ({(result.model_glb.file_size / 1024 / 1024).toFixed(2)} MB)
+                                            </a>
+                                        )}
+                                        
+                                        {/* Additional Formats */}
+                                        {result.model_urls && (
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                                {result.model_urls.obj?.url && (
+                                                    <a href={result.model_urls.obj.url} download="model.obj" target="_blank" className="px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-all text-center text-sm">
+                                                        OBJ
+                                                    </a>
+                                                )}
+                                                {result.model_urls.fbx?.url && (
+                                                    <a href={result.model_urls.fbx.url} download="model.fbx" target="_blank" className="px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition-all text-center text-sm">
+                                                        FBX
+                                                    </a>
+                                                )}
+                                                {result.model_urls.usdz?.url && (
+                                                    <a href={result.model_urls.usdz.url} download="model.usdz" target="_blank" className="px-4 py-3 bg-violet-600 hover:bg-violet-700 text-white font-semibold rounded-lg transition-all text-center text-sm">
+                                                        USDZ
+                                                    </a>
+                                                )}
+                                                {result.model_urls.stl?.url && (
+                                                    <a href={result.model_urls.stl.url} download="model.stl" target="_blank" className="px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-all text-center text-sm">
+                                                        STL
+                                                    </a>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Features */}
+                        <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-6">
+                            <h3 className="font-semibold text-blue-900 mb-3">✨ Features</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm text-blue-800">
+                                <div className="flex items-start gap-2">
+                                    <span>🎨</span>
+                                    <span>AI Background Removal (BiRefNet v2)</span>
+                                </div>
+                                <div className="flex items-start gap-2">
+                                    <span>⭐</span>
+                                    <span>Highest quality Meshy-6 AI</span>
+                                </div>
+                                <div className="flex items-start gap-2">
+                                    <span>📦</span>
+                                    <span>Multiple formats (GLB, OBJ, FBX, STL)</span>
+                                </div>
+                                <div className="flex items-start gap-2">
+                                    <span>🔭</span>
+                                    <span>Interactive 3D preview with orbit controls</span>
+                                </div>
+                                <div className="flex items-start gap-2">
+                                    <span>🚀</span>
+                                    <span>No CORS issues - works every time!</span>
+                                </div>
+                                <div className="flex items-start gap-2">
+                                    <span>💾</span>
+                                    <span>Download transparent PNG images</span>
+                                </div>
+                                <div className="flex items-start gap-2">
+                                    <span>🔒</span>
+                                    <span>Password protected & secure</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="text-center text-sm text-gray-500 mt-8">
+                            <p>My3DConverter • Deployed on Railway</p>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Main App Wrapper with Authentication
+        function App() {
+            const [authenticated, setAuthenticated] = useState(false);
+            const [appPassword, setAppPassword] = useState('');
+
+            useEffect(() => {
+                // Check if already authenticated in this session
+                const savedPassword = sessionStorage.getItem('app_password');
+                if (savedPassword) {
+                    setAppPassword(savedPassword);
+                    setAuthenticated(true);
+                }
+            }, []);
+
+            const handleUnlock = (password) => {
+                setAppPassword(password);
+                setAuthenticated(true);
+            };
+
+            if (!authenticated) {
+                return <PasswordScreen onUnlock={handleUnlock} />;
+            }
+
+            return <MainApp appPassword={appPassword} />;
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
